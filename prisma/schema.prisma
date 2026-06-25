@@ -5,9 +5,8 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
-}
+  provider = "prisma-client-js"
+}  
 
 datasource db {
   provider = "postgresql"
@@ -16,18 +15,19 @@ datasource db {
 
 
 model User {
-  id String @id @default(uuid())
-  name String
-  email String @unique
-  password String
-  matricNo String?
-  role Role @default(STUDENT)
-  department String
-  level String?
-  
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  password    String
+  matricNo    String?  @unique // Added unique constraint for matric numbers
+  role        Role     @default(STUDENT)
+  department  String
+  level       String?
+  createdAt   DateTime @default(now())
 
-  createdAt DateTime @default(now())
-
+  // Explicitly named relations
+  attendanceRecords Attendancelist[] @relation("StudentAttendance")
+  markedAttendance  Attendancelist[] @relation("AttendanceMarker")
 }
 
 enum Role {
@@ -37,28 +37,34 @@ enum Role {
 }
 
 model Class {
-  id String @id @default(uuid())
-  course_no String
-  name String
-  type String
+  id        String   @id @default(uuid())
+  course_no String   @unique // Usually course codes (e.g., CS101) are unique
+  name      String
+  type      String   // e.g., Lecture, Practical
   createdAt DateTime @default(now())
+
+  attendance Attendancelist[]
 }
 
 model Attendancelist {
-  id String @id @default(uuid())
-  userId String
-  classId String 
-  status attendanceStatus @default(ABSENT)
-  createBy String
+  id              String           @id @default(uuid())
+  classId         String 
+  studentId       String           // Restored: The student being marked
+  status          attendanceStatus @default(ABSENT)
+  createBy        String           // The Teacher/Rep marking it
   attendance_date DateTime
-  updatedAt DateTime @default(now())
-  
+  updatedAt       DateTime         @updatedAt // Changed @default(now()) to @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  class Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+  // Relations
+  student   User   @relation("StudentAttendance", fields: [studentId], references: [id], onDelete: Cascade)
+  marker    User   @relation("AttendanceMarker", fields: [createBy], references: [id])
+  class     Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  // Prevents duplicate entries: A student can only have one attendance record per class per specific date/time
+  @@unique([studentId, classId, attendance_date]) 
 }
 
-enum attendanceStatus{
+enum attendanceStatus {
   PRESENT
   ABSENT
 }
